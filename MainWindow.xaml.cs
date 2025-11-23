@@ -114,16 +114,12 @@ namespace ContentSyncApp
                 {
                     Dispatcher.Invoke(() => LogInfo("=== ANALYSE GESTARTET ==="));
 
-                    var deFiles = Directory.GetFiles(
-                        Path.Combine(projectPath, "de"), 
-                        "*.htm", 
-                        SearchOption.AllDirectories
-                    );
+                    var deFiles = GetFilteredHtmlFiles(Path.Combine(projectPath, "de"));
 
                     Dispatcher.Invoke(() =>
                     {
-                        txtDeFiles.Text = deFiles.Length.ToString();
-                        LogInfo($"Gefundene DE-Dateien: {deFiles.Length}");
+                        txtDeFiles.Text = deFiles.Count.ToString();
+                        LogInfo($"Gefundene DE-Dateien: {deFiles.Count} (ausgeschlossene Verzeichnisse: intern, _temp, _backup, .git, .svn)");
                     });
 
                     int totalToSync = 0;
@@ -213,11 +209,7 @@ namespace ContentSyncApp
             {
                 try
                 {
-                    var deFiles = Directory.GetFiles(
-                        Path.Combine(projectPath, "de"), 
-                        "*.htm", 
-                        SearchOption.AllDirectories
-                    );
+                    var deFiles = GetFilteredHtmlFiles(Path.Combine(projectPath, "de"));
 
                     int successCount = 0;
                     int errorCount = 0;
@@ -230,7 +222,7 @@ namespace ContentSyncApp
                         CreateBackup(projectPath, languages);
                     }
 
-                    int totalOperations = deFiles.Length * languages.Count;
+                    int totalOperations = deFiles.Count * languages.Count;
                     int currentOperation = 0;
 
                     foreach (var lang in languages)
@@ -375,6 +367,50 @@ namespace ContentSyncApp
             foreach (var dir in Directory.GetDirectories(sourceDir))
             {
                 CopyDirectory(dir, Path.Combine(targetDir, Path.GetFileName(dir)));
+            }
+        }
+
+        private List<string> GetFilteredHtmlFiles(string rootPath)
+        {
+            var filteredFiles = new List<string>();
+            CollectHtmlFilesRecursive(rootPath, filteredFiles);
+            return filteredFiles;
+        }
+
+        private void CollectHtmlFilesRecursive(string currentPath, List<string> fileList)
+        {
+            try
+            {
+                // Prüfe ob aktuelles Verzeichnis ausgeschlossen werden soll
+                var dirName = Path.GetFileName(currentPath);
+                if (!string.IsNullOrEmpty(dirName) && fileMapper.IsDirectoryExcluded(dirName))
+                {
+                    return;
+                }
+
+                // Sammle HTM-Dateien im aktuellen Verzeichnis (nicht ausgeschlossene)
+                foreach (var file in Directory.GetFiles(currentPath, "*.htm"))
+                {
+                    var fileName = Path.GetFileName(file);
+                    if (!fileMapper.IsFileExcluded(fileName))
+                    {
+                        fileList.Add(file);
+                    }
+                }
+
+                // Rekursiv in Unterverzeichnisse
+                foreach (var subDir in Directory.GetDirectories(currentPath))
+                {
+                    CollectHtmlFilesRecursive(subDir, fileList);
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Überspringe Verzeichnisse ohne Zugriff
+            }
+            catch (Exception ex)
+            {
+                Dispatcher.Invoke(() => LogWarning($"Warnung beim Durchsuchen von {currentPath}: {ex.Message}"));
             }
         }
 
