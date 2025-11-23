@@ -122,17 +122,32 @@ namespace ContentSyncApp
                         LogInfo($"Gefundene DE-Dateien: {deFiles.Count} (ausgeschlossene Verzeichnisse: intern, _temp, _backup, .git, .svn)");
                     });
 
+                    // Generiere Mapping-Tabelle
+                    Dispatcher.Invoke(() => LogInfo("\nGeneriere Datei-Mapping-Tabelle..."));
+                    var mappingTable = GenerateFileMappingTable(projectPath, languages);
+
+                    // Speichere Mapping-Tabelle
+                    var mappingPath = Path.Combine(projectPath, $"file_mapping_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                    File.WriteAllText(mappingPath, mappingTable);
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        LogSuccess($"✓ Mapping-Tabelle gespeichert: {mappingPath}");
+                        btnExport.IsEnabled = true;
+                        btnExport.Tag = mappingPath;
+                    });
+
                     int totalToSync = 0;
                     var missingFiles = new List<string>();
 
                     foreach (var lang in languages)
                     {
                         Dispatcher.Invoke(() => LogInfo($"\nAnalysiere {lang.ToUpper()}..."));
-                        
+
                         foreach (var deFile in deFiles)
                         {
                             var targetFile = fileMapper.GetTargetPath(deFile, projectPath, lang);
-                            
+
                             if (!File.Exists(targetFile))
                             {
                                 missingFiles.Add($"{lang}: {Path.GetFileName(targetFile)}");
@@ -147,7 +162,7 @@ namespace ContentSyncApp
                     Dispatcher.Invoke(() =>
                     {
                         txtToSync.Text = totalToSync.ToString();
-                        
+
                         if (missingFiles.Count > 0)
                         {
                             LogWarning($"\n⚠ {missingFiles.Count} Dateien haben kein Gegenstück:");
@@ -162,6 +177,7 @@ namespace ContentSyncApp
                         }
 
                         LogSuccess($"\n✓ Analyse abgeschlossen: {totalToSync} Dateien können synchronisiert werden");
+                        LogInfo($"📊 Öffnen Sie die Mapping-Tabelle für Details: file_mapping_*.txt");
                         btnSync.IsEnabled = totalToSync > 0;
                     });
                 }
@@ -210,6 +226,13 @@ namespace ContentSyncApp
                 try
                 {
                     var deFiles = GetFilteredHtmlFiles(Path.Combine(projectPath, "de"));
+
+                    // Generiere Mapping-Tabelle vor der Synchronisation
+                    Dispatcher.Invoke(() => LogInfo("Generiere Datei-Mapping-Tabelle..."));
+                    var mappingTable = GenerateFileMappingTable(projectPath, languages);
+                    var mappingPath = Path.Combine(projectPath, $"file_mapping_sync_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                    File.WriteAllText(mappingPath, mappingTable);
+                    Dispatcher.Invoke(() => LogSuccess($"✓ Mapping-Tabelle gespeichert: {mappingPath}"));
 
                     int successCount = 0;
                     int errorCount = 0;
@@ -375,6 +398,118 @@ namespace ContentSyncApp
             var filteredFiles = new List<string>();
             CollectHtmlFilesRecursive(rootPath, filteredFiles);
             return filteredFiles;
+        }
+
+        private string GenerateFileMappingTable(string projectPath, List<string> languages)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=".PadRight(150, '='));
+            sb.AppendLine("DATEI-MAPPING ÜBERSICHT");
+            sb.AppendLine($"Generiert: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Projektpfad: {projectPath}");
+            sb.AppendLine("=".PadRight(150, '='));
+            sb.AppendLine();
+
+            var deFiles = GetFilteredHtmlFiles(Path.Combine(projectPath, "de"));
+
+            sb.AppendLine($"Gefundene DE-Dateien: {deFiles.Count}");
+            sb.AppendLine($"Zu synchronisierende Sprachen: {string.Join(", ", languages.Select(l => l.ToUpper()))}");
+            sb.AppendLine();
+            sb.AppendLine("-".PadRight(150, '-'));
+
+            // Header
+            sb.Append("DE-DATEI".PadRight(60));
+            foreach (var lang in languages)
+            {
+                sb.Append($"{lang.ToUpper(),-15}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("-".PadRight(150, '-'));
+
+            int totalMappings = 0;
+            int existingMappings = 0;
+            int missingMappings = 0;
+
+            foreach (var deFile in deFiles)
+            {
+                // Relativer Pfad zur besseren Lesbarkeit
+                var deRelativePath = deFile.Replace(Path.Combine(projectPath, "de") + Path.DirectorySeparatorChar, "");
+                sb.Append(deRelativePath.PadRight(60));
+
+                foreach (var lang in languages)
+                {
+                    totalMappings++;
+                    try
+                    {
+                        var targetFile = fileMapper.GetTargetPath(deFile, projectPath, lang);
+                        var targetRelativePath = targetFile.Replace(Path.Combine(projectPath, lang) + Path.DirectorySeparatorChar, "");
+
+                        if (File.Exists(targetFile))
+                        {
+                            sb.Append("✓ ".PadRight(15));
+                            existingMappings++;
+                        }
+                        else
+                        {
+                            sb.Append("✗ FEHLT".PadRight(15));
+                            missingMappings++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        sb.Append($"✗ ERROR".PadRight(15));
+                        missingMappings++;
+                    }
+                }
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("-".PadRight(150, '-'));
+            sb.AppendLine();
+            sb.AppendLine("ZUSAMMENFASSUNG:");
+            sb.AppendLine($"  Gesamt DE-Dateien:        {deFiles.Count}");
+            sb.AppendLine($"  Sprachen:                 {languages.Count}");
+            sb.AppendLine($"  Gesamt Mappings:          {totalMappings}");
+            sb.AppendLine($"  Existierende Zieldateien: {existingMappings} ({(totalMappings > 0 ? (existingMappings * 100.0 / totalMappings).ToString("F1") : "0")}%)");
+            sb.AppendLine($"  Fehlende Zieldateien:     {missingMappings} ({(totalMappings > 0 ? (missingMappings * 100.0 / totalMappings).ToString("F1") : "0")}%)");
+            sb.AppendLine();
+
+            // Detaillierte Liste fehlender Dateien
+            if (missingMappings > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("FEHLENDE DATEIEN (Details):");
+                sb.AppendLine("-".PadRight(150, '-'));
+
+                foreach (var deFile in deFiles)
+                {
+                    var deRelativePath = deFile.Replace(Path.Combine(projectPath, "de") + Path.DirectorySeparatorChar, "");
+
+                    foreach (var lang in languages)
+                    {
+                        try
+                        {
+                            var targetFile = fileMapper.GetTargetPath(deFile, projectPath, lang);
+                            if (!File.Exists(targetFile))
+                            {
+                                var targetRelativePath = targetFile.Replace(Path.Combine(projectPath, lang) + Path.DirectorySeparatorChar, "");
+                                sb.AppendLine($"  [{lang.ToUpper()}] {deRelativePath}");
+                                sb.AppendLine($"       → Erwartet: {targetRelativePath}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            sb.AppendLine($"  [{lang.ToUpper()}] {deRelativePath}");
+                            sb.AppendLine($"       → FEHLER: {ex.Message}");
+                        }
+                    }
+                }
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("=".PadRight(150, '='));
+
+            return sb.ToString();
         }
 
         private void CollectHtmlFilesRecursive(string currentPath, List<string> fileList)
