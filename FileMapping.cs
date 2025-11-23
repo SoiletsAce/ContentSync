@@ -78,35 +78,34 @@ namespace ContentSyncApp
         }
 
         /// <summary>
-        /// Konvertiert eine relative oder absolute URL in einen lokalen Dateipfad
+        /// Konvertiert eine URL aus hreflang in einen lokalen Dateipfad
+        /// Beispiel: https://www.password-depot.de/cs/download/download-server.htm
+        ///        -> projectRoot/cs/download/download-server.htm
         /// </summary>
         public string UrlToFilePath(string url, string projectRoot, string language)
         {
             try
             {
-                // Entferne Domain falls vorhanden
+                // Schritt 1: Entferne Domain falls vorhanden
+                // https://www.password-depot.de/cs/download/download-server.htm
+                // -> /cs/download/download-server.htm
                 if (url.StartsWith("http://") || url.StartsWith("https://"))
                 {
                     var uri = new Uri(url);
                     url = uri.AbsolutePath;
                 }
 
-                // Entferne führenden Slash
+                // Schritt 2: Entferne führenden Slash
+                // /cs/download/download-server.htm -> cs/download/download-server.htm
                 url = url.TrimStart('/');
 
-                // Entferne Sprachcode am Anfang (z.B. "/en/..." -> "...")
-                var parts = url.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length > 0 && parts[0].Length == 2)
-                {
-                    // Erste Komponente ist Sprachcode
-                    url = string.Join("/", parts, 1, parts.Length - 1);
-                }
-
-                // Konvertiere zu Windows-Pfad
+                // Schritt 3: Konvertiere zu Windows-Pfad (falls nötig)
                 url = url.Replace('/', Path.DirectorySeparatorChar);
 
-                // Kombiniere mit Projektpfad und Sprache
-                var filePath = Path.Combine(projectRoot, language, url);
+                // Schritt 4: Kombiniere direkt mit Projektpfad
+                // projectRoot + cs/download/download-server.htm
+                // = projectRoot/cs/download/download-server.htm
+                var filePath = Path.Combine(projectRoot, url);
 
                 return filePath;
             }
