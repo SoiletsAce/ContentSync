@@ -1,19 +1,119 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace ContentSyncApp
 {
     public class FileMapping
     {
-        // Mapping-Tabellen für Verzeichnisnamen DE -> andere Sprachen
+        // Mapping-Tabellen für Verzeichnisnamen DE -> andere Sprachen (Fallback)
         private readonly Dictionary<string, Dictionary<string, string>> directoryMappings;
-        
+
         public FileMapping()
         {
             directoryMappings = new Dictionary<string, Dictionary<string, string>>();
             InitializeMappings();
+        }
+
+        /// <summary>
+        /// Liest die hreflang-Links aus einer HTML-Datei und gibt die Zuordnungen zurück
+        /// </summary>
+        public Dictionary<string, string> ExtractLanguageLinks(string htmlFilePath)
+        {
+            var languageLinks = new Dictionary<string, string>();
+
+            try
+            {
+                string content = File.ReadAllText(htmlFilePath, Encoding.UTF8);
+
+                // Regex für <link rel="alternate" hreflang="xx" href="...">
+                // Unterstützt verschiedene Varianten (mit/ohne Leerzeichen, Reihenfolge, etc.)
+                var patterns = new[]
+                {
+                    @"<link\s+rel=[""']alternate[""']\s+hreflang=[""']([a-z]{2})[""']\s+href=[""']([^""']+)[""']\s*/?>",
+                    @"<link\s+hreflang=[""']([a-z]{2})[""']\s+rel=[""']alternate[""']\s+href=[""']([^""']+)[""']\s*/?>",
+                    @"<link\s+hreflang=[""']([a-z]{2})[""']\s+href=[""']([^""']+)[""']\s+rel=[""']alternate[""']\s*/?>",
+                    @"<link\s+href=[""']([^""']+)[""']\s+rel=[""']alternate[""']\s+hreflang=[""']([a-z]{2})[""']\s*/?>",
+                    @"<link\s+href=[""']([^""']+)[""']\s+hreflang=[""']([a-z]{2})[""']\s+rel=[""']alternate[""']\s*/?>",
+                    @"<link\s+rel=[""']alternate[""']\s+href=[""']([^""']+)[""']\s+hreflang=[""']([a-z]{2})[""']\s*/?>"
+                };
+
+                foreach (var pattern in patterns)
+                {
+                    var regex = new Regex(pattern, RegexOptions.IgnoreCase);
+                    var matches = regex.Matches(content);
+
+                    foreach (Match match in matches)
+                    {
+                        string lang, href;
+
+                        // Je nach Pattern-Reihenfolge sind die Gruppen unterschiedlich
+                        if (pattern.IndexOf("hreflang") < pattern.IndexOf("href"))
+                        {
+                            lang = match.Groups[1].Value;
+                            href = match.Groups[2].Value;
+                        }
+                        else
+                        {
+                            href = match.Groups[1].Value;
+                            lang = match.Groups[2].Value;
+                        }
+
+                        if (!languageLinks.ContainsKey(lang))
+                        {
+                            languageLinks[lang] = href;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Bei Fehler leeres Dictionary zurückgeben
+                Console.WriteLine($"Fehler beim Extrahieren der Language-Links aus {htmlFilePath}: {ex.Message}");
+            }
+
+            return languageLinks;
+        }
+
+        /// <summary>
+        /// Konvertiert eine relative oder absolute URL in einen lokalen Dateipfad
+        /// </summary>
+        public string UrlToFilePath(string url, string projectRoot, string language)
+        {
+            try
+            {
+                // Entferne Domain falls vorhanden
+                if (url.StartsWith("http://") || url.StartsWith("https://"))
+                {
+                    var uri = new Uri(url);
+                    url = uri.AbsolutePath;
+                }
+
+                // Entferne führenden Slash
+                url = url.TrimStart('/');
+
+                // Entferne Sprachcode am Anfang (z.B. "/en/..." -> "...")
+                var parts = url.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0 && parts[0].Length == 2)
+                {
+                    // Erste Komponente ist Sprachcode
+                    url = string.Join("/", parts, 1, parts.Length - 1);
+                }
+
+                // Konvertiere zu Windows-Pfad
+                url = url.Replace('/', Path.DirectorySeparatorChar);
+
+                // Kombiniere mit Projektpfad und Sprache
+                var filePath = Path.Combine(projectRoot, language, url);
+
+                return filePath;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private void InitializeMappings()
@@ -113,18 +213,48 @@ namespace ContentSyncApp
 
         public string GetTargetPath(string deFilePath, string projectRoot, string targetLanguage)
         {
+            string targetPath;
+            string source;
+            return GetTargetPath(deFilePath, projectRoot, targetLanguage, out targetPath, out source) ? targetPath : null;
+        }
+
+        /// <summary>
+        /// Erweiterte Version die auch die Quelle des Mappings zurückgibt
+        /// </summary>
+        public bool GetTargetPath(string deFilePath, string projectRoot, string targetLanguage, out string targetPath, out string mappingSource)
+        {
+            targetPath = null;
+            mappingSource = "unknown";
+
             try
             {
+                // PRIMÄR: Versuche zuerst, die Zuordnung aus den hreflang-Links zu lesen
+                var languageLinks = ExtractLanguageLinks(deFilePath);
+
+                if (languageLinks.ContainsKey(targetLanguage))
+                {
+                    var url = languageLinks[targetLanguage];
+                    var path = UrlToFilePath(url, projectRoot, targetLanguage);
+
+                    if (path != null)
+                    {
+                        targetPath = path;
+                        mappingSource = "hreflang";
+                        return true;
+                    }
+                }
+
+                // FALLBACK: Verwende das alte manuelle Mapping
                 // Relativen Pfad vom DE-Ordner extrahieren
                 var dePath = Path.Combine(projectRoot, "de");
                 var relativePath = GetRelativePath(dePath, deFilePath);
 
                 // Pfad-Komponenten aufteilen
                 var pathParts = relativePath.Split(Path.DirectorySeparatorChar);
-                
+
                 // Dateiname mapping
                 var fileName = MapFileName(Path.GetFileName(deFilePath), targetLanguage);
-                
+
                 // Verzeichnispfad mapping
                 var mappedParts = new List<string>();
                 for (int i = 0; i < pathParts.Length - 1; i++)
@@ -135,13 +265,15 @@ namespace ContentSyncApp
 
                 // Zielpfad zusammensetzen
                 var targetRelativePath = string.Join(Path.DirectorySeparatorChar.ToString(), mappedParts);
-                var targetPath = Path.Combine(projectRoot, targetLanguage, targetRelativePath);
-                
-                return targetPath;
+                targetPath = Path.Combine(projectRoot, targetLanguage, targetRelativePath);
+                mappingSource = "fallback";
+
+                return true;
             }
             catch (Exception ex)
             {
-                throw new Exception($"Fehler beim Mapping von {deFilePath}: {ex.Message}");
+                mappingSource = $"error: {ex.Message}";
+                return false;
             }
         }
 

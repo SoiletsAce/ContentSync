@@ -429,6 +429,8 @@ namespace ContentSyncApp
             int totalMappings = 0;
             int existingMappings = 0;
             int missingMappings = 0;
+            int hreflangMappings = 0;
+            int fallbackMappings = 0;
 
             foreach (var deFile in deFiles)
             {
@@ -441,17 +443,34 @@ namespace ContentSyncApp
                     totalMappings++;
                     try
                     {
-                        var targetFile = fileMapper.GetTargetPath(deFile, projectPath, lang);
-                        var targetRelativePath = targetFile.Replace(Path.Combine(projectPath, lang) + Path.DirectorySeparatorChar, "");
+                        string targetFile;
+                        string mappingSource;
 
-                        if (File.Exists(targetFile))
+                        if (fileMapper.GetTargetPath(deFile, projectPath, lang, out targetFile, out mappingSource))
                         {
-                            sb.Append("✓ ".PadRight(15));
-                            existingMappings++;
+                            var targetRelativePath = targetFile.Replace(Path.Combine(projectPath, lang) + Path.DirectorySeparatorChar, "");
+
+                            if (File.Exists(targetFile))
+                            {
+                                string marker = mappingSource == "hreflang" ? "✓" : "✓f";
+                                sb.Append($"{marker} ".PadRight(15));
+                                existingMappings++;
+
+                                if (mappingSource == "hreflang")
+                                    hreflangMappings++;
+                                else
+                                    fallbackMappings++;
+                            }
+                            else
+                            {
+                                string marker = mappingSource == "hreflang" ? "✗ FEHLT" : "✗ FEHLT(f)";
+                                sb.Append(marker.PadRight(15));
+                                missingMappings++;
+                            }
                         }
                         else
                         {
-                            sb.Append("✗ FEHLT".PadRight(15));
+                            sb.Append("✗ ERROR".PadRight(15));
                             missingMappings++;
                         }
                     }
@@ -466,11 +485,19 @@ namespace ContentSyncApp
 
             sb.AppendLine("-".PadRight(150, '-'));
             sb.AppendLine();
+            sb.AppendLine("LEGENDE:");
+            sb.AppendLine("  ✓   = Datei existiert (aus hreflang-Links)");
+            sb.AppendLine("  ✓f  = Datei existiert (aus Fallback-Mapping)");
+            sb.AppendLine("  ✗ FEHLT     = Datei fehlt (hreflang vorhanden)");
+            sb.AppendLine("  ✗ FEHLT(f)  = Datei fehlt (Fallback-Mapping)");
+            sb.AppendLine();
             sb.AppendLine("ZUSAMMENFASSUNG:");
             sb.AppendLine($"  Gesamt DE-Dateien:        {deFiles.Count}");
             sb.AppendLine($"  Sprachen:                 {languages.Count}");
             sb.AppendLine($"  Gesamt Mappings:          {totalMappings}");
             sb.AppendLine($"  Existierende Zieldateien: {existingMappings} ({(totalMappings > 0 ? (existingMappings * 100.0 / totalMappings).ToString("F1") : "0")}%)");
+            sb.AppendLine($"    └─ via hreflang:        {hreflangMappings}");
+            sb.AppendLine($"    └─ via Fallback:        {fallbackMappings}");
             sb.AppendLine($"  Fehlende Zieldateien:     {missingMappings} ({(totalMappings > 0 ? (missingMappings * 100.0 / totalMappings).ToString("F1") : "0")}%)");
             sb.AppendLine();
 
@@ -489,12 +516,22 @@ namespace ContentSyncApp
                     {
                         try
                         {
-                            var targetFile = fileMapper.GetTargetPath(deFile, projectPath, lang);
-                            if (!File.Exists(targetFile))
+                            string targetFile;
+                            string mappingSource;
+
+                            if (fileMapper.GetTargetPath(deFile, projectPath, lang, out targetFile, out mappingSource))
                             {
-                                var targetRelativePath = targetFile.Replace(Path.Combine(projectPath, lang) + Path.DirectorySeparatorChar, "");
+                                if (!File.Exists(targetFile))
+                                {
+                                    var targetRelativePath = targetFile.Replace(Path.Combine(projectPath, lang) + Path.DirectorySeparatorChar, "");
+                                    sb.AppendLine($"  [{lang.ToUpper()}] {deRelativePath}");
+                                    sb.AppendLine($"       → Erwartet ({mappingSource}): {targetRelativePath}");
+                                }
+                            }
+                            else
+                            {
                                 sb.AppendLine($"  [{lang.ToUpper()}] {deRelativePath}");
-                                sb.AppendLine($"       → Erwartet: {targetRelativePath}");
+                                sb.AppendLine($"       → FEHLER beim Mapping ({mappingSource})");
                             }
                         }
                         catch (Exception ex)
