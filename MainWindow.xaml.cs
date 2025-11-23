@@ -412,6 +412,39 @@ namespace ContentSyncApp
 
             var deFiles = GetFilteredHtmlFiles(Path.Combine(projectPath, "de"));
 
+            // DEBUG: Prüfe erste Datei auf hreflang-Links
+            if (deFiles.Count > 0)
+            {
+                var testFile = deFiles[0];
+                var testLinks = fileMapper.ExtractLanguageLinks(testFile);
+                sb.AppendLine($"DEBUG - Erste Datei: {Path.GetFileName(testFile)}");
+                sb.AppendLine($"DEBUG - Vollständiger DE-Pfad: {testFile}");
+                sb.AppendLine($"DEBUG - Gefundene hreflang-Links: {testLinks.Count}");
+
+                if (testLinks.Count > 0)
+                {
+                    foreach (var link in testLinks.Take(3))
+                    {
+                        sb.AppendLine($"  DEBUG - {link.Key}: {link.Value}");
+
+                        // Teste die Pfad-Konvertierung
+                        string targetPath;
+                        string mappingSource;
+                        if (fileMapper.GetTargetPath(testFile, projectPath, link.Key, out targetPath, out mappingSource))
+                        {
+                            bool exists = File.Exists(targetPath);
+                            sb.AppendLine($"    → Ziel: {targetPath}");
+                            sb.AppendLine($"    → Existiert: {exists}");
+                        }
+                    }
+                }
+                else
+                {
+                    sb.AppendLine("  !!! WARNUNG: Keine hreflang-Links gefunden! Regex funktioniert nicht!");
+                }
+                sb.AppendLine();
+            }
+
             sb.AppendLine($"Gefundene DE-Dateien: {deFiles.Count}");
             sb.AppendLine($"Zu synchronisierende Sprachen: {string.Join(", ", languages.Select(l => l.ToUpper()))}");
             sb.AppendLine();

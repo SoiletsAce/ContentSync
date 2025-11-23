@@ -28,50 +28,50 @@ namespace ContentSyncApp
             {
                 string content = File.ReadAllText(htmlFilePath, Encoding.UTF8);
 
-                // Regex für <link rel="alternate" hreflang="xx" href="...">
-                // Unterstützt verschiedene Varianten (mit/ohne Leerzeichen, Reihenfolge, etc.)
-                var patterns = new[]
-                {
-                    @"<link\s+rel=[""']alternate[""']\s+hreflang=[""']([a-z]{2})[""']\s+href=[""']([^""']+)[""']\s*/?>",
-                    @"<link\s+hreflang=[""']([a-z]{2})[""']\s+rel=[""']alternate[""']\s+href=[""']([^""']+)[""']\s*/?>",
-                    @"<link\s+hreflang=[""']([a-z]{2})[""']\s+href=[""']([^""']+)[""']\s+rel=[""']alternate[""']\s*/?>",
-                    @"<link\s+href=[""']([^""']+)[""']\s+rel=[""']alternate[""']\s+hreflang=[""']([a-z]{2})[""']\s*/?>",
-                    @"<link\s+href=[""']([^""']+)[""']\s+hreflang=[""']([a-z]{2})[""']\s+rel=[""']alternate[""']\s*/?>",
-                    @"<link\s+rel=[""']alternate[""']\s+href=[""']([^""']+)[""']\s+hreflang=[""']([a-z]{2})[""']\s*/?>"
-                };
+                // EINFACHE, robuste Regex die alle Attribute in beliebiger Reihenfolge findet
+                // Findet <link ... hreflang="xx" ... href="..." ... />
+                var regex = new Regex(
+                    @"<link\s+[^>]*hreflang\s*=\s*[""']([a-z]{2})[""'][^>]*href\s*=\s*[""']([^""']+)[""'][^>]*>",
+                    RegexOptions.IgnoreCase
+                );
 
-                foreach (var pattern in patterns)
-                {
-                    var regex = new Regex(pattern, RegexOptions.IgnoreCase);
-                    var matches = regex.Matches(content);
+                var matches = regex.Matches(content);
 
-                    foreach (Match match in matches)
+                foreach (Match match in matches)
+                {
+                    string lang = match.Groups[1].Value;
+                    string href = match.Groups[2].Value;
+
+                    if (!languageLinks.ContainsKey(lang))
                     {
-                        string lang, href;
+                        languageLinks[lang] = href;
+                    }
+                }
 
-                        // Je nach Pattern-Reihenfolge sind die Gruppen unterschiedlich
-                        if (pattern.IndexOf("hreflang") < pattern.IndexOf("href"))
-                        {
-                            lang = match.Groups[1].Value;
-                            href = match.Groups[2].Value;
-                        }
-                        else
-                        {
-                            href = match.Groups[1].Value;
-                            lang = match.Groups[2].Value;
-                        }
+                // ALTERNATIVE: Falls hreflang nach href kommt
+                // <link ... href="..." ... hreflang="xx" ... />
+                var regexAlt = new Regex(
+                    @"<link\s+[^>]*href\s*=\s*[""']([^""']+)[""'][^>]*hreflang\s*=\s*[""']([a-z]{2})[""'][^>]*>",
+                    RegexOptions.IgnoreCase
+                );
 
-                        if (!languageLinks.ContainsKey(lang))
-                        {
-                            languageLinks[lang] = href;
-                        }
+                var matchesAlt = regexAlt.Matches(content);
+
+                foreach (Match match in matchesAlt)
+                {
+                    string href = match.Groups[1].Value;
+                    string lang = match.Groups[2].Value;
+
+                    if (!languageLinks.ContainsKey(lang))
+                    {
+                        languageLinks[lang] = href;
                     }
                 }
             }
             catch (Exception ex)
             {
                 // Bei Fehler leeres Dictionary zurückgeben
-                Console.WriteLine($"Fehler beim Extrahieren der Language-Links aus {htmlFilePath}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Fehler beim Extrahieren der Language-Links aus {htmlFilePath}: {ex.Message}");
             }
 
             return languageLinks;
