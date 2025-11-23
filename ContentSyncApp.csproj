@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>sync.ico</ApplicationIcon>
+    <AssemblyName>PasswordDepotContentSync</AssemblyName>
+    <RootNamespace>ContentSyncApp</RootNamespace>
+    <Company>AceBIT GmbH</Company>
+    <Product>Password Depot Content Synchronizer</Product>
+    <Version>1.0.0</Version>
+    <Description>Synchronisiert HTML-Inhalte zwischen Sprachversionen der Password Depot Website</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

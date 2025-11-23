@@ -1,0 +1,175 @@
+<Window x:Class="ContentSyncApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Password Depot Content Sync Tool" 
+        Height="700" Width="1000"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#0D4E88" CornerRadius="5" Margin="0,0,0,10">
+            <StackPanel Margin="15">
+                <TextBlock Text="Password Depot Content Synchronization" 
+                          Foreground="White" FontSize="20" FontWeight="Bold"/>
+                <TextBlock Text="Kopiert Inhalte von DE-Version in alle anderen Sprachversionen" 
+                          Foreground="#E0E0E0" FontSize="12" Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Settings Panel -->
+        <GroupBox Grid.Row="1" Header="Einstellungen" Margin="0,0,0,10">
+            <Grid Margin="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="100"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="35"/>
+                    <RowDefinition Height="35"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Label Grid.Row="0" Grid.Column="0" Content="Projektordner:" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="0" Grid.Column="1" Name="txtProjectPath" 
+                        VerticalAlignment="Center" Margin="5,0"/>
+                <Button Grid.Row="0" Grid.Column="2" Name="btnBrowse" 
+                       Content="Durchsuchen..." Click="BtnBrowse_Click" 
+                       Height="25" Margin="5,0,0,0"/>
+
+                <Label Grid.Row="1" Grid.Column="0" Content="Backup erstellen:" VerticalAlignment="Center"/>
+                <CheckBox Grid.Row="1" Grid.Column="1" Name="chkBackup" 
+                         IsChecked="True" VerticalAlignment="Center" Margin="5,0">
+                    <TextBlock Text="Vor Änderungen Sicherungskopien erstellen (empfohlen)" />
+                </CheckBox>
+
+                <Label Grid.Row="2" Grid.Column="0" Content="Sync-Bereiche:" VerticalAlignment="Top" Margin="0,5,0,0"/>
+                <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="5,5,0,5">
+                    <TextBlock Text="Folgende Bereiche werden synchronisiert:" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBlock Text="• head - Meta-Tags, CSS-Verknüpfungen" Foreground="Gray"/>
+                    <TextBlock Text="• ScriptHeader - JavaScript im Header" Foreground="Gray"/>
+                    <TextBlock Text="• PageContent - Hauptinhalt der Seite" Foreground="Gray"/>
+                    <TextBlock Text="• PageEnde - Scripts am Seitenende" Foreground="Gray"/>
+                </StackPanel>
+
+                <Label Grid.Row="3" Grid.Column="0" Content="Zielsprachen:" VerticalAlignment="Top" Margin="0,5,0,0"/>
+                <WrapPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="5">
+                    <CheckBox Name="chkAll" Content="Alle" Margin="5" 
+                             Checked="ChkAll_Checked" Unchecked="ChkAll_Unchecked"/>
+                    <Separator Width="20" Background="Transparent"/>
+                    <CheckBox Name="chkCS" Content="CS (Tschechisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkDA" Content="DA (Dänisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkEL" Content="EL (Griechisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkEN" Content="EN (Englisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkES" Content="ES (Spanisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkFI" Content="FI (Finnisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkFR" Content="FR (Französisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkHU" Content="HU (Ungarisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkIT" Content="IT (Italienisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkNL" Content="NL (Niederländisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkNO" Content="NO (Norwegisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkPL" Content="PL (Polnisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkPT" Content="PT (Portugiesisch)" Margin="5" IsChecked="True"/>
+                    <CheckBox Name="chkSV" Content="SV (Schwedisch)" Margin="5" IsChecked="True"/>
+                </WrapPanel>
+            </Grid>
+        </GroupBox>
+
+        <!-- Action Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10">
+            <Button Name="btnAnalyze" Content="🔍 Analysieren" 
+                   Click="BtnAnalyze_Click" Width="120" Height="35" 
+                   Margin="5" FontSize="14" Background="#4CAF50" Foreground="White"/>
+            <Button Name="btnSync" Content="🔄 Synchronisieren" 
+                   Click="BtnSync_Click" Width="140" Height="35" 
+                   Margin="5" FontSize="14" Background="#FA6923" Foreground="White"
+                   IsEnabled="False"/>
+            <Button Name="btnCancel" Content="⏹ Abbrechen" 
+                   Click="BtnCancel_Click" Width="120" Height="35" 
+                   Margin="5" FontSize="14" IsEnabled="False"/>
+            <Button Name="btnExport" Content="📊 Report exportieren" 
+                   Click="BtnExport_Click" Width="140" Height="35" 
+                   Margin="5" FontSize="14" IsEnabled="False"/>
+        </StackPanel>
+
+        <!-- Log/Status Area -->
+        <GroupBox Grid.Row="3" Header="Status &amp; Protokoll">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                
+                <ProgressBar Grid.Row="0" Name="progressBar" Height="20" Margin="5"
+                            Visibility="Collapsed"/>
+                
+                <RichTextBox Grid.Row="1" Name="rtbLog" 
+                            VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Auto"
+                            FontFamily="Consolas" FontSize="11"
+                            IsReadOnly="True" Margin="5">
+                    <FlowDocument>
+                        <Paragraph>
+                            <Run Text="Bereit zum Start..." Foreground="Gray"/>
+                        </Paragraph>
+                    </FlowDocument>
+                </RichTextBox>
+            </Grid>
+        </GroupBox>
+
+        <!-- Statistics Panel -->
+        <GroupBox Grid.Row="4" Header="Statistik" Margin="0,10,0,0">
+            <Grid Margin="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Gefundene DE-Dateien:" FontWeight="Bold"/>
+                    <TextBlock Name="txtDeFiles" Text="0" FontSize="18" Foreground="#0D4E88"/>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Zu synchronisieren:" FontWeight="Bold"/>
+                    <TextBlock Name="txtToSync" Text="0" FontSize="18" Foreground="#FA6923"/>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="Erfolgreich:" FontWeight="Bold"/>
+                    <TextBlock Name="txtSuccess" Text="0" FontSize="18" Foreground="Green"/>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="3">
+                    <TextBlock Text="Fehler:" FontWeight="Bold"/>
+                    <TextBlock Name="txtErrors" Text="0" FontSize="18" Foreground="Red"/>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+
+        <!-- Status Bar -->
+        <StatusBar Grid.Row="5">
+            <StatusBarItem>
+                <TextBlock Name="txtStatus" Text="Bereit"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Name="txtTime" Text=""/>
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</Window>
